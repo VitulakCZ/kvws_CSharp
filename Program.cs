@@ -46,12 +46,14 @@ class Hrac : VychoziCisla {
 static class Hra {
     static int kola = 1;
     static int penize_za_kolo = 2;
+    static string obtiznost = string.Empty;
     public static bool obtiznost_menu(ref Hrac? hrac, ref string str) {
         Console.Write("Na jakou chceš hrát obtížnost\nE = Easy\nN = Normal\nH = Hard: ");
         str = Console.ReadLine()!.ToUpper();
         if (str != "E" && str != "N" && str != "H")
             return false;
-        hrac = new Hrac(str);
+        obtiznost = str;
+        hrac = new Hrac(obtiznost);
         return true;
     }
     public static bool hlavni_menu(ref string str) {
@@ -122,6 +124,100 @@ static class Hra {
         }
         return false;
     }
+    static void investovat(ref Hrac? hrac, ref bool err) {
+        int investice;
+        Console.Write("Kolik chceš investovat?\n6 (+1 peníz za kolo)\n10 (+2 peníze za kolo): ");
+        try {
+            investice = Convert.ToInt32(Console.ReadLine());
+        } catch (FormatException) {
+            err = true;
+            return;
+        } catch (OverflowException) {
+            err = true;
+            return;
+        }
+
+        if (investice != 6 && investice != 10) {
+            err = true;
+            return;
+        }
+        if (hrac!.penize < investice) {
+            Console.WriteLine("NEMÁŠ DOSTATEK FINANCÍ!\n");
+            return;
+        }
+        if (penize_za_kolo > ((investice == 6) ? 4 : 3) && !(obtiznost == "E") || penize_za_kolo > ((investice == 6) ? 9 : 8)) {
+            Console.WriteLine("Už jsi investoval až moc peněz!\n");
+            return;
+        }
+        hrac.penize -= investice;
+        penize_za_kolo += (int)Math.Floor((double)investice / 5);
+        string penize_str;
+        if (penize_za_kolo < 5)
+            penize_str = " peníze za kolo";
+        else
+            penize_str = " peněz za kolo";
+        Console.WriteLine($"{penize_za_kolo}{penize_str}");
+    }
+    static void banka(ref Hrac? hrac, ref bool err) {
+        int banka;
+
+        if (hrac!.banka >= 6) {
+            Console.WriteLine("Už sis půjčil až moc peněz!\n");
+            return;
+        }
+
+        Console.Write("Kolik si chceš půjčit? 1, 2, 3 mld? ");
+        try {
+            banka = Convert.ToInt32(Console.ReadLine());
+        } catch (FormatException) {
+            err = true;
+            return;
+        } catch (OverflowException) {
+            err = true;
+            return;
+        }
+
+        if (banka < 1 || banka > 3) {
+            err = true;
+            return;
+        }
+
+        if (hrac.banka + banka * 2 > 6)
+            Console.WriteLine("Nemůžeš si tolik půjčit!\n");
+        else {
+            hrac.penize += banka;
+            hrac.banka += banka * 2;
+        }
+        Console.WriteLine($"Dluh v tento moment máš {hrac.banka} mld.");
+    }
+    static bool dalsiKolo(ref Hrac? hrac, ref bool err) {
+        if (++kola == 50) {
+            Console.WriteLine("Nestihl jsi dohrát hru pod 50 kol.\nGAME OVER");
+            return true;
+        }
+        hrac!.penize += penize_za_kolo;
+        hrac.penize -= hrac.banka;
+        hrac.banka = 0;
+
+        bool isHard = obtiznost == "H";
+        bool isEasy = obtiznost == "E";
+
+        for (int kolo = 0; kolo < 50; kolo += isEasy ? 10 : 5) {
+            if (kolo != kola)
+                continue;
+
+            if (hrac.vojaci < 1000 || (hrac.vojaci < 2000 && isHard)) {
+                Console.WriteLine("Zaútočili na tebe, nemáš dostatek vojáků na protiútok.\nGAME OVER");
+                return true;
+            }
+
+            hrac.vojaci -= isHard ? 2000 : 1000;
+            Console.WriteLine($"Zaútočili na tebe! Nově máš {hrac.vojaci} vojáků!\n");
+            kola += 1;
+            break;
+        }
+        return false;
+    }
 
     public static bool hra(ref Hrac? hrac, ref bool err) {
         Console.Write($"{kola}. KOLO!\nK = Koupit vojáky, V = Válka, I = Investovat, B = Banka, D = Další kolo, E = Exit: ");
@@ -133,6 +229,16 @@ static class Hra {
         case "V":
             bool vyhra = valka(ref hrac, ref err);
             if (vyhra) return true;
+            break;
+        case "I":
+            investovat(ref hrac, ref err);
+            break;
+        case "B":
+            banka(ref hrac, ref err);
+            break;
+        case "D":
+            bool prohra = dalsiKolo(ref hrac, ref err);
+            if (prohra) return true;
             break;
         case "E":
             return true;
